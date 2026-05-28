@@ -1,2 +1,5 @@
 do-not-see/
 venv/
+.env 
+token.json
+credentials.json

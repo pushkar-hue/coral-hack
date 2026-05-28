@@ -18,7 +18,7 @@ class CompetitiveProgrammingScraper:
 
     def calculate_stars(self, rating):
         """Manually calculates CodeChef stars based on official rating bands."""
-        if rating is None:
+        if rating is None:                                          
             return None
         if rating < 1400:
             return 1
