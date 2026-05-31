@@ -23,9 +23,6 @@ I authored **Custom Source Specs (manifest.yaml)** to turn live web platforms in
 * **CodeChef (`codechef.yaml`):** Created a Local JSONL Bridge to ingest scraped profile metrics natively into Coral.
 * **Google Calendar (`google_calendar.yaml`):** Utilized Coral's built-in OAuth authorization-code flow to securely fetch upcoming schedule availability.
 
-### The "Meaningful JOIN"
-
-Because all platforms are now unified under Coral, the agent's "brain" operates on a single, powerful cross-platform SQL query. Instead of making three different API calls, the agent executes this exact JOIN to instantly find out what topics you are failing at, and cross-references your Google Calendar to see if you've actually carved out time to study them:
 ### The "Meaningful JOIN" 
 Because all platforms are now unified under Coral, the agent's "brain" operates on a single, powerful cross-platform SQL query. Instead of making three different API calls, the agent executes this exact JOIN to instantly find out what topics you are failing at, and cross-references your Google Calendar to see if you've actually carved out time to study them:
 
