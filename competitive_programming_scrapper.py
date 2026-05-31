@@ -141,13 +141,18 @@ class CompetitiveProgrammingScraper:
                 rank_link = rank_list.find('a')
                 if rank_link:
                     global_rank = self.safe_int(rank_link.text)
-            
-            return {
+                    
+
+            codechef_data = {
                 "username": self.username,
                 "current_rating": current_rating,
                 "global_rank": global_rank,
                 "stars": stars
             }
+            with open("codechef_profile.jsonl", "a") as f:
+                 f.write(json.dumps(codechef_data) + "\n")
+
+            return codechef_data 
             
         except Exception as e:
             return {"error": f"Failed to fetch CodeChef data: {str(e)}"}

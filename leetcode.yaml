@@ -1,0 +1,35 @@
+name: leetcode
+version: 0.1.0
+dsl_version: 3
+backend: http
+inputs:
+  LEETCODE_USERNAME:
+    kind: variable
+    hint: Your LeetCode username
+    default: "notaceninja"
+base_url: "https://leetcode.com"
+tables:
+  - name: topic_stats
+    description: LeetCode solved problems grouped by topic
+    request:
+      method: POST
+      path: /graphql/
+      headers:
+        - name: Content-Type
+          from: literal
+          value: application/json
+      body:
+        - path: [query]
+          from: template
+          template: 'query { matchedUser(username: "{{input.LEETCODE_USERNAME}}") { tagProblemCounts { fundamental { tagName problemsSolved } intermediate { tagName problemsSolved } advanced { tagName problemsSolved } } } }'
+    response:
+      rows_path:
+        - data
+        - matchedUser
+        - tagProblemCounts
+        - intermediate
+    columns:
+      - name: tagName
+        type: Utf8
+      - name: problemsSolved
+        type: Int64

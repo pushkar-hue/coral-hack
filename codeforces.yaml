@@ -1,0 +1,32 @@
+name: codeforces
+version: 0.1.0
+dsl_version: 3
+backend: http
+inputs:
+  CODEFORCES_HANDLE:
+    kind: variable
+    hint: Your Codeforces username
+    default: "notaceninja"
+base_url: "https://codeforces.com/api"
+tables:
+  - name: profile
+    description: Codeforces User Profile
+    request:
+      method: GET
+      path: /user.info
+      query:
+        - name: handles
+          from: template
+          template: "{{input.CODEFORCES_HANDLE}}"
+    response:
+      rows_path:
+        - result
+    columns:
+      - name: handle
+        type: Utf8
+      - name: rating
+        type: Int64
+      - name: maxRating
+        type: Int64
+      - name: rank
+        type: Utf8

@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
-
 from langchain.agents import create_agent
 
 # Import existing tools from the user's scripts
@@ -25,23 +24,67 @@ from notion_page_retrival import (
     extract_database_rows,
     NOTION_TARGETS
 )
-from competitive_programming_scrapper import CompetitiveProgrammingScraper, get_upcoming_competitions
+# ONLY importing the upcoming competitions helper, the scraper class is gone!
+from competitive_programming_scrapper import get_upcoming_competitions
 
 # Load environment variables
 load_dotenv()
+
+# ---------------------------------------------------------
+# Coral Helper Function
+# ---------------------------------------------------------
+def execute_coral_query(query: str) -> str:
+    """Helper to execute SQL queries directly against Coral."""
+    print(f"\n[Coral Data Layer] Executing Query: {query}")
+    try:
+        result = subprocess.run(
+            ["coral", "sql", query, "--format", "json"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        return f"Error executing query: {e.stderr}"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 # ---------------------------------------------------------
 # Wrap non-tool functions as Langchain tools
 # ---------------------------------------------------------
 
 @tool
+def query_coral_database(sql_query: str) -> str:
+    """
+    Executes a custom SQL query against the Coral Unified Database.
+    Available schemas: leetcode.topic_stats, codechef.profile, codeforces.profile, google_calendar.events
+    """
+    return execute_coral_query(sql_query)
+
+@tool
+def get_leetcode_stats(username: str) -> str:
+    """Fetches topic-wise stats from LeetCode using the Coral Unified Data Layer."""
+    query = 'SELECT "tagName", "problemsSolved" FROM leetcode.topic_stats ORDER BY "problemsSolved" ASC LIMIT 5;'
+    return execute_coral_query(query)
+
+@tool
+def get_codechef_stats(username: str) -> str:
+    """Fetches rating and rank statistics from CodeChef using the Coral Unified Data Layer."""
+    query = 'SELECT username, current_rating, global_rank, stars FROM codechef.profile;'
+    return execute_coral_query(query)
+
+@tool
+def get_codeforces_stats(username: str) -> str:
+    """Fetches profile statistics from Codeforces using the Coral Unified Data Layer."""
+    query = 'SELECT handle, rating, "maxRating", rank FROM codeforces.profile;'
+    return execute_coral_query(query)
+
+@tool
 def add_notion_task(task_title: str) -> str:
-    """
-    Inserts a new task into the Notion Task List Board.
-    """
+    """Inserts a new task into the Notion Task List Board."""
     db_id = NOTION_TARGETS.get("Task List Board", {}).get("id")
     if not db_id or db_id == "YOUR_TRUE_DATABASE_ID_HERE":
-        return "Error: Please set 'YOUR_TRUE_DATABASE_ID_HERE' in notion_page_retrival.py under NOTION_TARGETS['Task List Board']['id']"
+        return "Error: Please set 'YOUR_TRUE_DATABASE_ID_HERE' in notion_page_retrival.py"
     
     print(f"\n[Notion Tool] Adding task: {task_title}")
     success = _add_notion_task(db_id, task_title)
@@ -49,31 +92,12 @@ def add_notion_task(task_title: str) -> str:
 
 @tool
 def get_notion_page_content(page_id: str) -> str:
-    """
-    Extracts human-readable text from a Notion page. 
-    Use id '36dac41d8487809c9f36e36667295344' for Notes or 'ab107fc93e23451584e88751e9996143' for Student Dashboard.
-    """
+    """Extracts human-readable text from a Notion page."""
     return extract_page_content(page_id)
 
 @tool
-def get_leetcode_stats(username: str) -> str:
-    """Fetches general stats AND topic-wise stats from LeetCode."""
-    scraper = CompetitiveProgrammingScraper(username)
-    data = scraper.get_leetcode_data()
-    return json.dumps(data)
-
-@tool
-def get_codechef_stats(username: str) -> str:
-    """Scrapes rating and rank statistics from CodeChef."""
-    scraper = CompetitiveProgrammingScraper(username)
-    data = scraper.get_codechef_stats()
-    return json.dumps(data)
-
-@tool
 def append_notion_note(content: str) -> str:
-    """
-    Appends study materials and resources directly to the Notion Notes page.
-    """
+    """Appends study materials and resources directly to the Notion Notes page."""
     page_id = NOTION_TARGETS.get("Notes", {}).get("id")
     if not page_id:
         return "Error: Could not find Notes page ID."
@@ -84,10 +108,7 @@ def append_notion_note(content: str) -> str:
 
 @tool
 def append_notion_resource(title: str, url: str, is_video: bool = False) -> str:
-    """
-    Appends a sleek, clickable bookmark or embedded video directly to the Notion Notes page.
-    Use this for saving web articles, LeetCode problem URLs, or YouTube videos.
-    """
+    """Appends a sleek, clickable bookmark or embedded video directly to the Notion Notes page."""
     page_id = NOTION_TARGETS.get("Notes", {}).get("id")
     if not page_id:
         return "Error: Could not find Notes page ID."
@@ -105,10 +126,7 @@ def get_upcoming_coding_competitions() -> str:
 
 @tool
 def web_search(query: str, search_type: str = "search") -> str:
-    """
-    Searches the web using the Serper API. 
-    `search_type` can be "search" (for articles/LeetCode problems) or "videos" (for YouTube tutorials).
-    """
+    """Searches the web using the Serper API for articles or videos."""
     api_key = os.getenv("SERPER_API_KEY")
     if not api_key:
         return "Error: SERPER_API_KEY is not set in .env."
@@ -140,32 +158,13 @@ def web_search(query: str, search_type: str = "search") -> str:
     except Exception as e:
         return f"Web search failed: {e}"
 
-@tool
-def query_coral_database(sql_query: str) -> str:
-    """
-    Executes a SQL query against the Coral Unified Database.
-    Schema includes: leetcode_profile, leetcode_topics, codechef_profile, notion_syllabus, calendar_events.
-    """
-    print(f"\n[Coral Tool] Executing Query: {sql_query}")
-    try:
-        result = subprocess.run(
-            ["coral", "sql", sql_query, "--format", "json"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        return f"Error executing query: {e.stderr}"
-    except Exception as e:
-        return f"Error: {str(e)}"
 
 # ---------------------------------------------------------
 # Agent Orchestration
 # ---------------------------------------------------------
 
 def get_agent():
-    # Initialize the OpenRouter model with the user's requested model string
+    # Initialize the OpenRouter model
     llm = ChatOpenAI(
         api_key=os.environ.get("OPENROUTER_API_KEY", "dummy"),
         base_url="https://openrouter.ai/api/v1",
@@ -181,6 +180,7 @@ def get_agent():
         get_notion_page_content,
         get_leetcode_stats,
         get_codechef_stats,
+        get_codeforces_stats,
         query_coral_database,
         append_notion_note,
         append_notion_resource,
@@ -195,31 +195,24 @@ def get_agent():
     system_message = f"""You are 'The Grandmaster’s Ledger', an autonomous AI training officer.
 Your goal is to optimize an engineer's competitive programming and technical interview roadmap.
 
-USER CONTEXT (DO NOT ASK FOR THESE, USE THEM AUTOMATICALLY):
+USER CONTEXT:
 - LeetCode Username: {leetcode_username}
 - CodeChef Username: {codechef_username}
 - Google Calendar ID: {calendar_id}
 
-You have access to the following tools to get data and perform actions:
-- `get_leetcode_stats` / `get_codechef_stats` to analyze programming profiles.
-- `get_notion_page_content` to review their notes/syllabus (use Notes ID: 36dac41d8487809c9f36e36667295344, Student Dashboard ID: ab107fc93e23451584e88751e9996143).
-- `get_upcoming_coding_competitions` to fetch upcoming coding contests from Codeforces, LeetCode, and CodeChef.
-- `get_upcoming_events` / `get_events_by_date_range` to check their Google Calendar.
-- `web_search` to find exact LeetCode problem URLs (search_type="search") and YouTube video tutorials (search_type="videos"). Do NOT hallucinate URLs, use this tool to find real ones.
-- `add_notion_task` to assign specific high-yield problems or topics to study.
-- `append_notion_note` to add generic text, syllabus, or study plans directly to their Notion Notes. You MUST use markdown formatting (## for sections).
-- `append_notion_resource` to add sleek Bookmark cards for LeetCode problems/articles, or embedded Videos for YouTube links. Set `is_video=True` for YouTube URLs!
-- `add_google_calendar_event` to block out focus time or schedule upcoming competitions on their calendar. You can schedule multiple blocks TODAY using the `start_time_utc` parameter (e.g., '2026-05-31T15:00:00Z') and `duration_hours`.
-- `query_coral_database` to run a unified SQL query across all data sources simultaneously if needed.
+CORAL DATA STRATEGY (CRITICAL):
+You are backed by the Coral Unified Data Engine. You must use `get_leetcode_stats`, `get_codechef_stats`, and `get_codeforces_stats` to query algorithmic weak spots directly via SQL. 
+If you need to perform an advanced cross-platform check, use the `query_coral_database` tool to execute a JOIN. For example:
+SELECT l."tagName", l."problemsSolved", c.summary FROM leetcode.topic_stats l LEFT JOIN google_calendar.events c ON c.summary ILIKE '%' || l."tagName" || '%' WHERE l."problemsSolved" < 15 ORDER BY l."problemsSolved" ASC LIMIT 5;
 
-When a user asks for a schedule or analysis:
-1. Fetch their stats and find weak points.
-2. Fetch upcoming contests and ACTUALY SCHEDULE those exact contests on their Google Calendar using `start_time_utc`.
-3. Schedule MULTIPLE focus blocks starting TODAY to cover the weak points using `start_time_utc`.
+ACTION PROTOCOL:
+1. Fetch stats and upcoming contests via Coral tools.
+2. Schedule EXACT contests on their Google Calendar using `start_time_utc`.
+3. Schedule MULTIPLE focus blocks TODAY to cover the weakest topics found in the database.
 4. Add those study topics as tasks in Notion using `add_notion_task`.
 5. Use `web_search` to find real articles, exact LeetCode problems, and YouTube video tutorials for the weak topics.
-6. Push the discovered links to Notion using `append_notion_resource`. (Pass the exact URL and set `is_video=True` for YouTube).
-Respond directly to the user after taking actions, summarizing the strategy and the actions taken.
+6. Push the discovered links to Notion using `append_notion_resource` (set `is_video=True` for YouTube).
+Respond directly to the user after taking actions, summarizing the strategy.
 """
     
     agent_executor = create_agent(llm, tools, system_prompt=system_message)
@@ -227,25 +220,39 @@ Respond directly to the user after taking actions, summarizing the strategy and 
 
 if __name__ == "__main__":
     agent = get_agent()
-    print("🤖 The Grandmaster's Ledger is online. (Type 'exit' to quit)\n")
+    print("🤖 The Grandmaster's Ledger is online.")
+    print("💡 Tip: You can paste multiple lines. Press Enter on an EMPTY line to send your message.\n")
     
     while True:
         try:
-            user_input = input("You: ")
+            print("You: ")
+            lines = []
+            while True:
+                line = input()
+                if line == "":
+                    break
+                lines.append(line)
+                
+            user_input = "\n".join(lines).strip()
+            
+            if not user_input:
+                continue
+                
             if user_input.lower() in ['exit', 'quit']:
+                print("\nShutting down The Grandmaster's Ledger...")
                 break
                 
             inputs = {"messages": [HumanMessage(content=user_input)]}
             
-            # Using standard stream output
             for chunk in agent.stream(inputs, stream_mode="values"):
                 message = chunk["messages"][-1]
                 if message.type == "ai" and message.content:
-                    print(f"Agent: {message.content}")
+                    print(f"\nAgent: {message.content}\n")
                 elif message.type == "tool":
                     print(f"Tool returned: {message.content[:200]}...")
                     
         except KeyboardInterrupt:
+            print("\nShutting down The Grandmaster's Ledger...")
             break
         except Exception as e:
             print(f"An error occurred: {e}")

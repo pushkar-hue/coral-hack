@@ -1,0 +1,20 @@
+name: codechef
+version: 0.1.0
+dsl_version: 3
+backend: file
+tables:
+  - name: profile
+    description: CodeChef profile metrics fed from the local Python scraper
+    format: jsonl
+    source:
+      location: file:///home/notninja/shtudy/coral/ # <-- UPDATE THIS TO YOUR EXACT PATH
+      glob: "codechef_profile.jsonl"
+    columns:
+      - name: username
+        type: Utf8
+      - name: current_rating
+        type: Int64
+      - name: global_rank
+        type: Int64
+      - name: stars
+        type: Int64
