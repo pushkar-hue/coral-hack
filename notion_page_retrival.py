@@ -137,38 +137,102 @@ def add_notion_task(db_id, task_title, title_column_name="Name"):
         print(f"❌ Failed to add task. API Error: {response.text}")
         return False
 
+import re
+
+def parse_md_to_rich_text(text):
+    rich_text = []
+    parts = re.split(r'\[(.*?)\]\((.*?)\)', text)
+    i = 0
+    while i < len(parts):
+        if parts[i]:
+            rich_text.append({"type": "text", "text": {"content": parts[i]}})
+        if i + 2 < len(parts):
+            rich_text.append({
+                "type": "text",
+                "text": {"content": parts[i+1], "link": {"url": parts[i+2]}}
+            })
+        i += 3
+    return rich_text
+
 def add_notion_note(page_id, text_content):
     """
-    Appends a new text block to a Notion page.
+    Appends markdown-formatted text blocks to a Notion page.
+    Supports basic paragraphs, heading_2 (##), heading_3 (###), and bulleted_list_item (- or *).
+    Also parses [text](url) links into rich_text links.
     """
     url = f"https://api.notion.com/v1/blocks/{page_id}/children"
     
+    children = []
+    lines = text_content.split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+            
+        block = {"object": "block"}
+        
+        if line.startswith("## "):
+            block["type"] = "heading_2"
+            block["heading_2"] = {"rich_text": parse_md_to_rich_text(line[3:].strip())}
+        elif line.startswith("### "):
+            block["type"] = "heading_3"
+            block["heading_3"] = {"rich_text": parse_md_to_rich_text(line[4:].strip())}
+        elif line.startswith("- ") or line.startswith("* "):
+            block["type"] = "bulleted_list_item"
+            block["bulleted_list_item"] = {"rich_text": parse_md_to_rich_text(line[2:].strip())}
+        else:
+            block["type"] = "paragraph"
+            block["paragraph"] = {"rich_text": parse_md_to_rich_text(line)}
+            
+        children.append(block)
+        
+    # Send chunks of 100 blocks at most
+    for i in range(0, len(children), 100):
+        chunk = children[i:i+100]
+        payload = {"children": chunk}
+        response = requests.patch(url, headers=NOTION_HEADERS, json=payload)
+        
+        if response.status_code != 200:
+            print(f"❌ Failed to append note. API Error: {response.text}")
+            return False
+            
+    print(f"✅ Successfully appended note to page {page_id}")
+    return True
+
+def append_notion_resource(page_id: str, title: str, url: str, is_video: bool = False):
+    """Appends a sleek, clickable bookmark or embedded video to the Notion page."""
+    
+    block_type = "video" if is_video else "bookmark"
+    block_content = {
+        "type": "external",
+        "external": { "url": url }
+    } if is_video else { "url": url }
+
     payload = {
         "children": [
             {
                 "object": "block",
-                "type": "paragraph",
-                "paragraph": {
-                    "rich_text": [
-                        {
-                            "type": "text",
-                            "text": {
-                                "content": text_content
-                            }
-                        }
-                    ]
+                "type": "heading_3",
+                "heading_3": {
+                    "rich_text": [{"type": "text", "text": {"content": title}}]
                 }
+            },
+            {
+                "object": "block",
+                "type": block_type,
+                block_type: block_content
             }
         ]
     }
     
-    response = requests.patch(url, headers=NOTION_HEADERS, json=payload)
-    
+    patch_url = f"https://api.notion.com/v1/blocks/{page_id}/children"
+    response = requests.patch(patch_url, headers=NOTION_HEADERS, json=payload)
     if response.status_code == 200:
-        print(f"✅ Successfully appended note to page {page_id}")
+        print(f"✅ Successfully appended resource '{title}' to page {page_id}")
         return True
     else:
-        print(f"❌ Failed to append note. API Error: {response.text}")
+        print(f"❌ Failed to append resource. API Error: {response.text}")
         return False
 
 def main():
