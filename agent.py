@@ -54,6 +54,31 @@ def execute_coral_query(query: str) -> str:
 # ---------------------------------------------------------
 
 @tool
+def get_unscheduled_weak_topics() -> str:
+    """
+    Executes a Coral SQL JOIN across LeetCode stats and Google Calendar.
+    Returns the top 5 weakest LeetCode topics that DO NOT currently have a study block scheduled.
+    """
+    query = """
+    SELECT 
+        l."tagName" AS weak_topic, 
+        l."problemsSolved", 
+        c.summary AS scheduled_block,
+        c.start_date_time
+    FROM 
+        leetcode.topic_stats l
+    LEFT JOIN 
+        google_calendar.events c 
+        ON c.summary ILIKE '%' || l."tagName" || '%'
+    WHERE 
+        l."problemsSolved" < 20
+    ORDER BY 
+        l."problemsSolved" ASC
+    LIMIT 5;
+    """
+    return execute_coral_query(query)
+
+@tool
 def query_coral_database(sql_query: str) -> str:
     """
     Executes a custom SQL query against the Coral Unified Database.
@@ -186,6 +211,7 @@ def get_agent():
         append_notion_resource,
         get_upcoming_coding_competitions,
         web_search
+        get_unscheduled_weak_topics
     ]
     
     leetcode_username = os.getenv("LEETCODE_USERNAME", "notaceninja")
