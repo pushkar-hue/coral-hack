@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import json
+from datetime import datetime, timedelta, timezone
 
 class CompetitiveProgrammingScraper:
     def __init__(self, username):
@@ -150,6 +151,59 @@ class CompetitiveProgrammingScraper:
             
         except Exception as e:
             return {"error": f"Failed to fetch CodeChef data: {str(e)}"}
+
+def get_upcoming_competitions():
+    """Fetches upcoming coding competitions from Codeforces, LeetCode, and CodeChef."""
+    competitions = []
+    
+    # Codeforces API
+    try:
+        response = requests.get('https://codeforces.com/api/contest.list')
+        data = response.json()
+        if data.get('status') == 'OK':
+            cf_upcoming = [c for c in data['result'] if c.get('phase') == 'BEFORE']
+            # Sort by startTimeSeconds
+            cf_upcoming.sort(key=lambda x: x.get('startTimeSeconds', float('inf')))
+            for c in cf_upcoming[:2]: # Get next 2
+                start_dt = datetime.fromtimestamp(c.get('startTimeSeconds'), tz=timezone.utc)
+                competitions.append({
+                    "platform": "Codeforces",
+                    "name": c.get('name'),
+                    "start_time_utc": start_dt.isoformat()
+                })
+    except Exception as e:
+        print(f"Failed to fetch Codeforces contests: {e}")
+
+    # LeetCode and CodeChef calculation
+    def get_next_weekday(dt, weekday_idx, hour_utc, minute_utc):
+        days_ahead = weekday_idx - dt.weekday()
+        if days_ahead <= 0:
+            if days_ahead == 0 and (dt.hour < hour_utc or (dt.hour == hour_utc and dt.minute < minute_utc)):
+                days_ahead = 0
+            else:
+                days_ahead += 7
+        next_date = dt + timedelta(days=days_ahead)
+        return next_date.replace(hour=hour_utc, minute=minute_utc, second=0, microsecond=0)
+
+    now_utc = datetime.now(timezone.utc)
+    
+    # Leetcode: Sunday (6) 02:30 UTC
+    next_lc = get_next_weekday(now_utc, 6, 2, 30)
+    competitions.append({
+        "platform": "LeetCode",
+        "name": "Weekly Contest",
+        "start_time_utc": next_lc.isoformat()
+    })
+    
+    # Codechef: Wednesday (2) 14:30 UTC
+    next_cc = get_next_weekday(now_utc, 2, 14, 30)
+    competitions.append({
+        "platform": "CodeChef",
+        "name": "Weekly Contest",
+        "start_time_utc": next_cc.isoformat()
+    })
+
+    return competitions
 
 if __name__ == "__main__":
     target_username = "notaceninja"

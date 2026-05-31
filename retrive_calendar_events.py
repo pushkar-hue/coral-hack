@@ -58,11 +58,19 @@ def execute_coral_query(query: str):
 # Tool 1: Insert Event (Google API)
 # ---------------------------------------------------------
 @tool
-def add_google_calendar_event(calendar_id: str, summary: str, description: str = "", hours_from_now: int = 1) -> str:
-    """Creates a new 1-hour event in Google Calendar using the official REST API."""
-    now = datetime.now(timezone.utc)
-    start_time = now + timedelta(hours=hours_from_now)
-    end_time = start_time + timedelta(hours=1)
+def add_google_calendar_event(calendar_id: str, summary: str, description: str = "", start_time_utc: str = None, hours_from_now: int = 1, duration_hours: float = 1.0) -> str:
+    """Creates a new event in Google Calendar.
+    If `start_time_utc` is provided (e.g. '2026-05-31T15:00:00Z'), it uses that exact time. 
+    Otherwise, it schedules it `hours_from_now` ahead.
+    """
+    if start_time_utc:
+        start_time_str = start_time_utc.replace('Z', '+00:00')
+        start_time = datetime.fromisoformat(start_time_str)
+    else:
+        now = datetime.now(timezone.utc)
+        start_time = now + timedelta(hours=hours_from_now)
+        
+    end_time = start_time + timedelta(hours=duration_hours)
     
     event_payload = {
         'summary': summary,

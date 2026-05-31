@@ -119,6 +119,11 @@ def add_notion_task(db_id, task_title, title_column_name="Name"):
                         }
                     }
                 ]
+            },
+            "Status": {
+                "select": {
+                    "name": "To Do"
+                }
             }
         }
     }
@@ -130,6 +135,40 @@ def add_notion_task(db_id, task_title, title_column_name="Name"):
         return True
     else:
         print(f"❌ Failed to add task. API Error: {response.text}")
+        return False
+
+def add_notion_note(page_id, text_content):
+    """
+    Appends a new text block to a Notion page.
+    """
+    url = f"https://api.notion.com/v1/blocks/{page_id}/children"
+    
+    payload = {
+        "children": [
+            {
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [
+                        {
+                            "type": "text",
+                            "text": {
+                                "content": text_content
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+    
+    response = requests.patch(url, headers=NOTION_HEADERS, json=payload)
+    
+    if response.status_code == 200:
+        print(f"✅ Successfully appended note to page {page_id}")
+        return True
+    else:
+        print(f"❌ Failed to append note. API Error: {response.text}")
         return False
 
 def main():

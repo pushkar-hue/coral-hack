@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
+
+from langchain.agents import create_agent
 
 # Import existing tools from the user's scripts
 from retrive_calendar_events import (
@@ -18,11 +19,12 @@ from retrive_calendar_events import (
 )
 from notion_page_retrival import (
     add_notion_task as _add_notion_task,
+    add_notion_note as _add_notion_note,
     extract_page_content,
     extract_database_rows,
     NOTION_TARGETS
 )
-from competitive_programming_scrapper import CompetitiveProgrammingScraper
+from competitive_programming_scrapper import CompetitiveProgrammingScraper, get_upcoming_competitions
 
 # Load environment variables
 load_dotenv()
@@ -67,6 +69,26 @@ def get_codechef_stats(username: str) -> str:
     return json.dumps(data)
 
 @tool
+def append_notion_note(content: str) -> str:
+    """
+    Appends study materials and resources directly to the Notion Notes page.
+    """
+    page_id = NOTION_TARGETS.get("Notes", {}).get("id")
+    if not page_id:
+        return "Error: Could not find Notes page ID."
+    
+    print(f"\n[Notion Tool] Appending note to page {page_id}")
+    success = _add_notion_note(page_id, content)
+    return "Note added successfully to Notion." if success else "Failed to add note to Notion."
+
+@tool
+def get_upcoming_coding_competitions() -> str:
+    """Fetches upcoming coding competitions from Codeforces, LeetCode, and CodeChef."""
+    print("\n[Scraper Tool] Fetching upcoming competitions...")
+    data = get_upcoming_competitions()
+    return json.dumps(data, indent=2)
+
+@tool
 def query_coral_database(sql_query: str) -> str:
     """
     Executes a SQL query against the Coral Unified Database.
@@ -95,7 +117,7 @@ def get_agent():
     llm = ChatOpenAI(
         api_key=os.environ.get("OPENROUTER_API_KEY", "dummy"),
         base_url="https://openrouter.ai/api/v1",
-        model="openai/gpt-oss-120b:free"
+        model="nvidia/nemotron-3-super-120b-a12b:free"
     )
     
     tools = [
@@ -107,24 +129,43 @@ def get_agent():
         get_notion_page_content,
         get_leetcode_stats,
         get_codechef_stats,
-        query_coral_database
+        query_coral_database,
+        append_notion_note,
+        get_upcoming_coding_competitions
     ]
     
-    system_message = """You are 'The Grandmaster’s Ledger', an autonomous AI training officer.
+    leetcode_username = os.getenv("LEETCODE_USERNAME", "notaceninja")
+    codechef_username = os.getenv("CODECHEF_USERNAME", "notaceninja")
+    calendar_id = os.getenv("GOOGLE_CALENDAR_ID", "pushkarsharma.rtm@gmail.com")
+    
+    system_message = f"""You are 'The Grandmaster’s Ledger', an autonomous AI training officer.
 Your goal is to optimize an engineer's competitive programming and technical interview roadmap.
+
+USER CONTEXT (DO NOT ASK FOR THESE, USE THEM AUTOMATICALLY):
+- LeetCode Username: {leetcode_username}
+- CodeChef Username: {codechef_username}
+- Google Calendar ID: {calendar_id}
 
 You have access to the following tools to get data and perform actions:
 - `get_leetcode_stats` / `get_codechef_stats` to analyze programming profiles.
 - `get_notion_page_content` to review their notes/syllabus (use Notes ID: 36dac41d8487809c9f36e36667295344, Student Dashboard ID: ab107fc93e23451584e88751e9996143).
+- `get_upcoming_coding_competitions` to fetch upcoming coding contests from Codeforces, LeetCode, and CodeChef.
 - `get_upcoming_events` / `get_events_by_date_range` to check their Google Calendar.
 - `add_notion_task` to assign specific high-yield problems or topics to study.
-- `add_google_calendar_event` to block out focus time on their calendar.
+- `append_notion_note` to add useful resource material and learning notes directly to their Notion Notes. (IMPORTANT: When adding study material, you MUST include clickable YouTube search links, e.g. `[Watch Segment Tree Tutorial](https://www.youtube.com/results?search_query=Segment+Tree+tutorial)`).
+- `add_google_calendar_event` to block out focus time or schedule upcoming competitions on their calendar. You can schedule multiple blocks TODAY using the `start_time_utc` parameter (e.g., '2026-05-31T15:00:00Z') and `duration_hours`.
 - `query_coral_database` to run a unified SQL query across all data sources simultaneously if needed.
 
-When a user asks for a schedule or analysis, fetch their data, analyze their weak points, and use the action tools (`add_notion_task`, `add_google_calendar_event`) to schedule their training. Respond directly to the user after taking actions, summarizing the strategy and the actions taken.
+When a user asks for a schedule or analysis:
+1. Fetch their stats and find weak points.
+2. Fetch upcoming contests and ACTUALY SCHEDULE those exact contests on their Google Calendar using `start_time_utc`.
+3. Schedule MULTIPLE focus blocks starting TODAY to cover the weak points using `start_time_utc`.
+4. Add those study topics as tasks in Notion using `add_notion_task`.
+5. Append YouTube search links and study material to Notion using `append_notion_note`.
+Respond directly to the user after taking actions, summarizing the strategy and the actions taken.
 """
     
-    agent_executor = create_react_agent(llm, tools, state_modifier=system_message)
+    agent_executor = create_agent(llm, tools, system_prompt=system_message)
     return agent_executor
 
 if __name__ == "__main__":
