@@ -26,22 +26,42 @@ I authored **Custom Source Specs (manifest.yaml)** to turn live web platforms in
 ### The "Meaningful JOIN"
 
 Because all platforms are now unified under Coral, the agent's "brain" operates on a single, powerful cross-platform SQL query. Instead of making three different API calls, the agent executes this exact JOIN to instantly find out what topics you are failing at, and cross-references your Google Calendar to see if you've actually carved out time to study them:
+### The "Meaningful JOIN" 
+Because all platforms are now unified under Coral, the agent's "brain" operates on a single, powerful cross-platform SQL query. Instead of making three different API calls, the agent executes this exact JOIN to instantly find out what topics you are failing at, and cross-references your Google Calendar to see if you've actually carved out time to study them:
 
-```sql
-SELECT 
-    l."tagName" AS weak_topic, 
-    l."problemsSolved", 
-    c.summary AS scheduled_focus_block
+```bash
+coral sql "SELECT 
+    l.\"tagName\" AS weak_topic, 
+    l.\"problemsSolved\", 
+    c.summary AS scheduled_block,
+    c.start_date_time
 FROM 
     leetcode.topic_stats l
 LEFT JOIN 
     google_calendar.events c 
-    ON c.summary ILIKE '%' || l."tagName" || '%'
+    ON c.summary ILIKE '%' || l.\"tagName\" || '%'
 WHERE 
-    l."problemsSolved" < 15
+    l.\"problemsSolved\" < 20
 ORDER BY 
-    l."problemsSolved" ASC
-LIMIT 5;
+    l.\"problemsSolved\" ASC;"
+```
+#### Live Output:
+```plaintext
++------------------+----------------+---------------------------+----------------------+
+| weak_topic       | problemsSolved | scheduled_block           | start_date_time      |
++------------------+----------------+---------------------------+----------------------+
+| Iterator         | 1              | Focus: Iterator           | 2026-05-31T16:40:23Z |
+| Brainteaser      | 1              | Focus: Brainteaser        | 2026-05-31T15:40:12Z |
+| Graph Theory     | 2              | Focus Block: Graph Theory | 2026-06-02T10:00:00Z |
+| Graph Theory     | 2              | Focus: Graph Theory       | 2026-05-31T15:00:00Z |
+| Graph Theory     | 2              | Focus Block: Graph Theory | 2026-06-01T15:00:00Z |
+| Graph Theory     | 2              | Focus: Graph Theory       | 2026-05-31T17:40:35Z |
+| Design           | 4              | Focus: Design             | 2026-05-31T18:42:01Z |
+| Recursion        | 10             |                           |                      |
+| Bit Manipulation | 10             |                           |                      |
+| Sliding Window   | 11             |                           |                      |
+| Greedy           | 19             |                           |                      |
++------------------+----------------+---------------------------+----------------------+
 ```
 
 ### Hybrid Architecture

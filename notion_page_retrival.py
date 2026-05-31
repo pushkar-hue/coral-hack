@@ -26,7 +26,7 @@ NOTION_TARGETS = {
         "type": "page"
     },
     "Task List Board": {
-        "id": "7ef8808dc3a54831879d6dcbcf15c188", # Insert the 32-character ID from the Board View link here
+        "id": "7ef8808dc3a54831879d6dcbcf15c188",
         "type": "database"
     }
 }

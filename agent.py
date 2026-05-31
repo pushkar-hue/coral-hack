@@ -9,7 +9,6 @@ from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 
-# Import existing tools from the user's scripts
 from retrive_calendar_events import (
     add_google_calendar_event,
     get_upcoming_events,
@@ -24,15 +23,9 @@ from notion_page_retrival import (
     extract_database_rows,
     NOTION_TARGETS
 )
-# ONLY importing the upcoming competitions helper, the scraper class is gone!
 from competitive_programming_scrapper import get_upcoming_competitions
 
-# Load environment variables
 load_dotenv()
-
-# ---------------------------------------------------------
-# Coral Helper Function
-# ---------------------------------------------------------
 def execute_coral_query(query: str) -> str:
     """Helper to execute SQL queries directly against Coral."""
     print(f"\n[Coral Data Layer] Executing Query: {query}")
@@ -49,9 +42,6 @@ def execute_coral_query(query: str) -> str:
     except Exception as e:
         return f"Error: {str(e)}"
 
-# ---------------------------------------------------------
-# Wrap non-tool functions as Langchain tools
-# ---------------------------------------------------------
 
 @tool
 def get_unscheduled_weak_topics() -> str:
@@ -183,10 +173,6 @@ def web_search(query: str, search_type: str = "search") -> str:
     except Exception as e:
         return f"Web search failed: {e}"
 
-
-# ---------------------------------------------------------
-# Agent Orchestration
-# ---------------------------------------------------------
 
 def get_agent():
     # Initialize the OpenRouter model
